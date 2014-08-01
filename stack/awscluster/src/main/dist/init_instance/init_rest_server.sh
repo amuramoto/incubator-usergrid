@@ -62,7 +62,7 @@ groovy wait_for_instances.groovy cassandra ${CASSANDRA_NUM_SERVERS}
 groovy wait_for_instances.groovy graphite ${GRAPHITE_NUM_SERVERS}
 
 mkdir -p /usr/share/tomcat7/lib 
-groovy configure_usergrid.groovy > /usr/share/tomcat7/lib/usergrid-custom.properties 
+groovy configure_usergrid.groovy > /usr/share/tomcat7/lib/usergrid-deployment.properties 
 
 rm -rf /var/lib/tomcat7/webapps/*
 cp -r /usr/share/usergrid/webapps/* /var/lib/tomcat7/webapps
@@ -70,6 +70,41 @@ groovy configure_portal_new.groovy >> /var/lib/tomcat7/webapps/portal/config.js
 
 cd /usr/share/usergrid/init_instance
 ./install_yourkit.sh
+./init_jmx_remote.sh
+
+# Set Tomcat RAM (80% max) and threads (250/core)
+case `(curl http://169.254.169.254/latest/meta-data/instance-type)` in 
+'m1.small' )
+	export TOMCAT_RAM=1250M
+	export TOMCAT_THREADS=250
+;; 
+'m1.medium' ) 
+	export TOMCAT_RAM=3G
+	export TOMCAT_THREADS=500
+;; 
+'m1.large' ) 
+	export TOMCAT_RAM=6G
+	export TOMCAT_THREADS=1000
+;; 
+'m1.xlarge' ) 
+	export TOMCAT_RAM=12G
+	export TOMCAT_THREADS=2000
+;; 
+'m3.xlarge' ) 
+	export TOMCAT_RAM=12G
+	export TOMCAT_THREADS=3250
+;; 
+'m3.large' ) 
+	export TOMCAT_RAM=6G
+	export TOMCAT_THREADS=1600
+;; 
+'c3.4xlarge' ) 
+	export TOMCAT_RAM=24G
+	export TOMCAT_THREADS=4000
+esac 
+
+sudo sed -i.bak "s/Xmx128m/Xmx${TOMCAT_RAM} -Xms${TOMCAT_RAM}/g" /etc/default/tomcat7
+sudo sed -i.bak "s/<Connector/<Connector maxThreads=\"${TOMCAT_THREADS}\" acceptCount=\"${TOMCAT_THREADS}\" maxConnections=\"${TOMCAT_THREADS}\"/g" /var/lib/tomcat7/conf/server.xml 
 
 # Go
 /etc/init.d/tomcat7 start

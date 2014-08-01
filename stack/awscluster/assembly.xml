@@ -28,7 +28,7 @@
 
         <file>
             <outputDirectory>webapps</outputDirectory> 
-            <source>../rest/target/ROOT.war</source>
+            <source>/Users/ApigeeCorporation/Downloads/usergrid-rest-apigee-production-20140714-1632.war</source>
             <!-- <source>/Users/ApigeeCorporation/src/usergrid-rest-apigee-production/target/ROOT.war</source> -->
             <destName>ROOT.war</destName> 
         </file>

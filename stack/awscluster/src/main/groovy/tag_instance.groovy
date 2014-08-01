@@ -25,6 +25,8 @@
 import com.amazonaws.auth.*
 import com.amazonaws.services.ec2.*
 import com.amazonaws.services.ec2.model.*
+import com.amazonaws.regions.Region
+import com.amazonaws.regions.Regions
 
 String type       = (String)System.getenv().get("TYPE")
 String accessKey  = (String)System.getenv().get("AWS_ACCESS_KEY")
@@ -34,6 +36,7 @@ String stackName  = (String)System.getenv().get("STACK_NAME")
 
 def creds = new BasicAWSCredentials(accessKey, secretKey)
 def ec2Client = new AmazonEC2Client(creds)
+ec2Client.setRegion(Region.getRegion(Regions.US_WEST_2))
 
 def resources = new ArrayList()
 resources.add(instanceId)

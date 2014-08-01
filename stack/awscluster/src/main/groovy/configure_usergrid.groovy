@@ -79,6 +79,7 @@ cassandra.url=${cassandras}
 cassandra.cluster=${clusterName}
 cassandra.keyspace.strategy=org.apache.cassandra.locator.SimpleStrategy
 cassandra.keyspace.replication=${replFactor}
+cassandra.connections=3500
 
 elasticsearch.cluster_name=${clusterName}
 elasticsearch.index_prefix=usergrid

@@ -22,7 +22,7 @@
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.simpledb.AmazonSimpleDBClient
 import com.amazonaws.services.simpledb.model.*
-
+import com.amazonaws.regions.*
 class NodeRegistry {
 
     private String accessKey = (String) System.getenv().get("AWS_ACCESS_KEY")
@@ -39,8 +39,16 @@ class NodeRegistry {
         // creates domain or no-op if it already exists
         creds = new BasicAWSCredentials(accessKey, secretKey)
         sdbClient = new AmazonSimpleDBClient(creds)
-
-        sdbClient.createDomain(new CreateDomainRequest(domain))
+        sdbClient.setRegion(Region.getRegion(Regions.US_WEST_2))
+        
+        while(true) {
+            try {
+                sdbClient.createDomain(new CreateDomainRequest(domain))
+                break
+            } catch(Exception e) {
+                continue
+            }
+        }
     }
 
     /**
@@ -48,7 +56,15 @@ class NodeRegistry {
      * @param defNodeType
      */
     def searchNode(def nodeType) {
-        def selectResult = sdbClient.select(new SelectRequest((String) "select * from `${domain}` where itemName() is not null and nodetype = '${nodeType}'  order by itemName()"))
+        def selectResult = null
+        while(true) {
+            try {
+                selectResult = sdbClient.select(new SelectRequest((String) "select * from `${domain}` where itemName() is not null and nodetype = '${nodeType}'  order by itemName()"))                
+                break                
+            } catch(Exception e) {
+                continue
+            }
+        }
         def result = []
 
         for (item in selectResult.getItems()) {
