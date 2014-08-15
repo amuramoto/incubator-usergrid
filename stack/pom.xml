@@ -101,9 +101,9 @@
     <hector-version>1.1-4</hector-version>
     <hector-test-version>1.1-4</hector-test-version>
     <jackson-version>1.9.9</jackson-version>
-    <jackson-2-version>2.3.1</jackson-2-version>
+    <jackson-2-version>2.3.3</jackson-2-version>
     <jclouds.version>1.6.2-incubating</jclouds.version>
-    <jersey-version>1.18</jersey-version>
+    <jersey-version>1.18.1</jersey-version>
     <junit-version>4.11</junit-version>
     <log4j-version>1.2.16</log4j-version>
     <metrics-version>2.1.2</metrics-version>
@@ -111,9 +111,10 @@
     <shiro-version>1.2.0</shiro-version>
     <slf4j-version>1.6.1</slf4j-version>
     <snakeyaml-version>1.8</snakeyaml-version>
-    <tomcat-version>7.0.42</tomcat-version>
+    <tomcat-version>7.0.52</tomcat-version>
     <antlr.version>3.4</antlr.version>
     <tika.version>1.4</tika.version>
+    <elasticsearch.version>1.2.3</elasticsearch.version>
 
   </properties>
 
@@ -160,6 +161,10 @@
       <id>tonuquq</id>
       <name>Alex Karasulu</name>
     </developer>
+    <developer>
+      <id>snoopdave</id>
+      <name>Dave Johnson</name>
+    </developer> 
   </developers>
 
   <scm>
@@ -185,18 +190,18 @@
   </distributionManagement>
 
   <modules>
+    <module>build-tools</module>
+    <module>test-utils</module>
     <module>config</module>
     <module>corepersistence</module>
     <module>core</module>
     <module>services</module>
-    <module>tools</module>
-    <module>mongo-emulator</module>
-    <module>websocket</module>
     <module>rest</module>
+<!--    <module>tools</module>
+    <module>websocket</module>
     <module>launcher</module>
-    <module>test-utils</module>
-    <module>query-validator</module>
-    <module>build-tools</module>
+    <module>mongo-emulator</module>
+    <module>query-validator</module>-->
   </modules>
 
   <dependencyManagement>
@@ -496,14 +501,8 @@
 
       <dependency>
         <groupId>org.apache.tomcat</groupId>
-        <artifactId>catalina</artifactId>
-        <version>6.0.29</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.tomcat</groupId>
-        <artifactId>juli</artifactId>
-        <version>6.0.29</version>
+        <artifactId>tomcat-catalina</artifactId>
+        <version>${tomcat-version}</version>
       </dependency>
 
       <dependency>
@@ -1400,7 +1399,15 @@
         <artifactId>activation</artifactId>
         <version>1.1</version>
       </dependency>
+
+    <dependency>
+        <groupId>org.elasticsearch</groupId>
+        <artifactId>elasticsearch</artifactId>
+        <version>${elasticsearch.version}</version>
+    </dependency>
+
     </dependencies>
+
   </dependencyManagement>
 
   <dependencies>
@@ -1473,8 +1480,8 @@
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.1</version>
           <configuration>
-            <source>1.6</source>
-            <target>1.6</target>
+            <source>1.7</source>
+            <target>1.7</target>
             <optimize>true</optimize>
             <showDeprecation>true</showDeprecation>
             <debug>true</debug>

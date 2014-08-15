@@ -37,41 +37,53 @@ import org.apache.usergrid.rest.AbstractContextResource;
 
 
 /** 
- * Reindex one application, for testing purposes only and only works with usergrid.test=true .
+ * Refresh index of an application, FOR TESTING PURPOSES ONLY. Only works with usergrid.test=true.
  */
 @Component
 @Scope("prototype")
-@Path("/testreindex")
+@Path("/refreshindex")
 @Produces({ MediaType.APPLICATION_JSON })
-public class ReindexResource extends AbstractContextResource {
-    static final Logger logger = LoggerFactory.getLogger( ReindexResource.class );
+public class RefreshIndexResource extends AbstractContextResource {
+    static final Logger logger = LoggerFactory.getLogger( RefreshIndexResource.class );
 
-    public ReindexResource() {}
-
+    public RefreshIndexResource() {}
 
     @POST
-    public Response setProperties( 
+    public Response refresh( 
             @QueryParam("org_name") String orgName, 
             @QueryParam("app_name") String appName, 
             @QueryParam("app_id") String appIdString ) throws IOException, Exception {
 
-        // only works in test mode
-        Properties props = management.getProperties();
-        String testProp = ( String ) props.get( "usergrid.test" );
-        if ( testProp == null || !Boolean.parseBoolean( testProp ) ) {
-            throw new UnsupportedOperationException();
+        try {
+
+            // only works in test mode
+            Properties props = management.getProperties();
+            String testProp = ( String ) props.get( "usergrid.test" );
+            if ( testProp == null || !Boolean.parseBoolean( testProp ) ) {
+                throw new UnsupportedOperationException();
+            }
+
+            UUID appId;
+            if ( orgName != null && appName != null ) {
+                appId = emf.lookupApplication( orgName + "/" + appName );
+            } else {
+                appId = UUID.fromString(appIdString);
+            }
+            
+            if ( appId != null ) {
+                // found an app, then refresh it!
+                EntityManager em = emf.getEntityManager( appId );
+                em.refreshIndex();
+            } 
+
+            // refresh the system app
+            emf.refreshIndex();
+
+        } catch (Exception e) {
+            logger.error("Error in refresh", e);
+            return Response.serverError().build();
         }
 
-        UUID appId;
-        if ( orgName != null && appName != null ) {
-            appId = emf.lookupApplication( orgName + "/" + appName );
-        } else {
-            appId = UUID.fromString(appIdString);
-        }
-         
-        EntityManager em = emf.getEntityManager( appId );
-        em.refreshIndex();
-
-        return Response.created( null ).build();
+        return Response.ok().build();
     }
 }

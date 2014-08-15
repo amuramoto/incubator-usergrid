@@ -153,7 +153,7 @@ public class CpRelationManager implements RelationManager {
 
     private static final Logger logger = LoggerFactory.getLogger( CpRelationManager.class );
 
-    public static final String ALL_TYPES = "zzzalltypesnzzz";
+    public static final String ALL_TYPES = "zzzalltypeszzz";
 
     private static final String EDGE_COLL_SUFFIX = "zzzcollzzz";
 
@@ -338,7 +338,7 @@ public class CpRelationManager implements RelationManager {
      * @param edgeType Edge type, edge type prefix or null to allow any edge type
      * @param fromEntityType Only consider edges from entities of this type
      */
-    private Map<EntityRef, Set<String>> getContainers( int limit, String edgeType, String fromEntityType ) {
+    Map<EntityRef, Set<String>> getContainers( int limit, String edgeType, String fromEntityType ) {
 
         Map<EntityRef, Set<String>> results = new LinkedHashMap<EntityRef, Set<String>>();
 
@@ -527,11 +527,13 @@ public class CpRelationManager implements RelationManager {
     public Results getCollection(String collectionName, UUID startResult, int count, 
             Level resultsLevel, boolean reversed) throws Exception {
 
-        // TODO: how to set Query startResult?
-
         Query query = Query.fromQL("select *");
         query.setLimit(count);
         query.setReversed(reversed);
+
+        if ( startResult != null ) {
+            query.addGreaterThanEqualFilter("created", startResult.timestamp());
+        }
 
         return searchCollection(collectionName, query);
     }
@@ -758,26 +760,45 @@ public class CpRelationManager implements RelationManager {
         org.apache.usergrid.persistence.model.entity.Entity memberEntity = memberMgr.load(
             new SimpleId( itemRef.getUuid(), itemRef.getType() )).toBlockingObservable().last();
 
+        // remove item from collection index
         IndexScope indexScope = new IndexScopeImpl(
             applicationScope.getApplication(), 
             cpHeadEntity.getId(), 
             CpEntityManager.getCollectionScopeNameFromCollectionName( collName ));
-
-        // remove from collection index
         EntityIndex ei = managerCache.getEntityIndex(indexScope);
         ei.deindex( memberEntity );
 
-        // remove collection edge
-        Edge edge = new SimpleEdge( 
+        // remove collection from item index 
+        IndexScope itemScope = new IndexScopeImpl(
+            applicationScope.getApplication(), 
+            memberEntity.getId(), 
+            CpEntityManager.getCollectionScopeNameFromCollectionName( 
+                Schema.defaultCollectionName( cpHeadEntity.getId().getType() )));
+        ei = managerCache.getEntityIndex(itemScope);
+        ei.deindex( cpHeadEntity );
+
+        // remove edge from collection to item 
+        GraphManager gm = managerCache.getGraphManager(applicationScope);
+        Edge collectionToItemEdge = new SimpleEdge( 
             cpHeadEntity.getId(),
             getEdgeTypeFromCollectionName( collName, memberEntity.getId().getType() ), 
             memberEntity.getId(), 
             memberEntity.getId().getUuid().timestamp() );
-        GraphManager gm = managerCache.getGraphManager(applicationScope);
-        gm.deleteEdge(edge).toBlockingObservable().last();
+        gm.deleteEdge(collectionToItemEdge).toBlockingObservable().last();
+
+        // remove edge from item to collection
+        Edge itemToCollectionEdge = new SimpleEdge( 
+            memberEntity.getId(), 
+            getEdgeTypeFromCollectionName( 
+                Schema.defaultCollectionName( cpHeadEntity.getId().getType() ), 
+                cpHeadEntity.getId().getType() ), 
+            cpHeadEntity.getId(),
+            cpHeadEntity.getId().getUuid().timestamp() );
+        gm.deleteEdge(itemToCollectionEdge).toBlockingObservable().last();
 
         // special handling for roles collection of a group
         if ( headEntity.getType().equals( Group.ENTITY_TYPE ) ) {
+
             if ( collName.equals( COLLECTION_ROLES ) ) {
                 String path = (String)( (Entity)itemRef ).getMetadata( "path" );
 
@@ -789,7 +810,8 @@ public class CpRelationManager implements RelationManager {
                     RoleRef roleRef = SimpleRoleRef.forRoleEntity( itemEntity );
                     em.deleteRole( roleRef.getApplicationRoleName() );
                 }
-            }
+
+            } 
         }
     }
 
@@ -801,9 +823,11 @@ public class CpRelationManager implements RelationManager {
         headEntity = em.validate( headEntity );
         dstEntityRef = em.validate( dstEntityRef );
 
-        CollectionInfo srcCollection = getDefaultSchema().getCollection( headEntity.getType(), srcRelationName );
+        CollectionInfo srcCollection = 
+                getDefaultSchema().getCollection( headEntity.getType(), srcRelationName );
 
-        CollectionInfo dstCollection = getDefaultSchema().getCollection( dstEntityRef.getType(), dstRelationName );
+        CollectionInfo dstCollection = 
+                getDefaultSchema().getCollection( dstEntityRef.getType(), dstRelationName );
 
         Results results = null;
         do {
@@ -939,7 +963,7 @@ public class CpRelationManager implements RelationManager {
         EntityIndex ei = managerCache.getEntityIndex(indexScope);
         ei.index( targetEntity );
 
-        // Index the new connection in app|source|type context
+        // Index the new connection in app|scope|all-types context
         IndexScope allTypesIndexScope = new IndexScopeImpl(
             applicationScope.getApplication(), 
             cpHeadEntity.getId(), 
@@ -1392,19 +1416,24 @@ public class CpRelationManager implements RelationManager {
 
         if ( query.isReversed() ) {
 
-            Query.SortPredicate newsp = new Query.SortPredicate( 
+            Query.SortPredicate desc = new Query.SortPredicate( 
                 PROPERTY_CREATED, Query.SortDirection.DESCENDING );
-            query.addSort( newsp ); 
-        }
 
-        // reverse chrono order by default
+            try {
+                query.addSort( desc ); 
+            } catch ( Exception e ) {
+                logger.warn("Attempted to reverse sort order already set", PROPERTY_CREATED);
+            }
+
+        } 
+            
         if ( query.getSortPredicates().isEmpty() ) {
 
-            Query.SortPredicate newsp = new Query.SortPredicate( 
-                PROPERTY_CREATED, Query.SortDirection.ASCENDING);
-            query.addSort( newsp ); 
-        }
+            Query.SortPredicate asc = new Query.SortPredicate( 
+                PROPERTY_CREATED, Query.SortDirection.ASCENDING );
 
+            query.addSort( asc ); 
+        }
 
         return query;
     }
@@ -1529,14 +1558,15 @@ public class CpRelationManager implements RelationManager {
                 org.apache.usergrid.persistence.model.entity.Entity e =
                     ecm.load( cr.getId() ).toBlockingObservable().last();
 
-//                if ( e == null ) {
-//                    logger.error("Entity {}:{} not found", cr.getId().getType(), cr.getId().getUuid());
-//                    continue;
-//                }
+                if ( e == null ) {
+                    logger.error("Entity {}:{} not found", cr.getId().getType(), cr.getId().getUuid());
+                    continue;
+                }
 
                 if ( cr.getVersion().compareTo( e.getVersion()) < 0 )  {
-                    logger.debug("Stale version uuid:{} type:{} version:{}", 
-                        new Object[] {cr.getId().getUuid(), cr.getId().getType(), cr.getVersion()});
+                    logger.debug("Stale version uuid:{} type:{} version:{} latest version:{}", 
+                        new Object[] {cr.getId().getUuid(), cr.getId().getType(), cr.getVersion(), 
+                            e.getVersion() });
                     continue;
                 }
 
@@ -1578,6 +1608,8 @@ public class CpRelationManager implements RelationManager {
         results.setCursor( crs.getCursor() );
         results.setQueryProcessor( new CpQueryProcessor(em, query, headEntity, collName) );
 
+        logger.debug("Returning results size {}", results.getIds().size() );
+
         return results;
     }
 
@@ -1593,7 +1625,8 @@ public class CpRelationManager implements RelationManager {
         IndexUpdate indexUpdate = batchStartIndexUpdate( batch, entity, setName, elementValue, 
                 timestampUuid, true, true, removeFromSet, false );
 
-        // Update collections
+        // Update collections 
+
         Map<String, Set<CollectionInfo>> containers =
                 getDefaultSchema().getContainersIndexingDictionary( entity.getType(), setName );
 
@@ -1910,6 +1943,8 @@ public class CpRelationManager implements RelationManager {
     private IndexUpdate doBackwardConnectionsUpdate( IndexUpdate indexUpdate ) throws Exception {
         final Entity targetEntity = indexUpdate.getEntity();
 
+        logger.debug( "doBackwardConnectionsUpdate" );
+
         final ConnectionTypesIterator connectionTypes =
             new ConnectionTypesIterator( cass, applicationId, targetEntity.getUuid(), false, 100 );
 
@@ -1947,6 +1982,8 @@ public class CpRelationManager implements RelationManager {
     @Metered(group = "core", name = "RelationManager_batchUpdateConnectionIndex")
     public IndexUpdate batchUpdateConnectionIndex( 
             IndexUpdate indexUpdate, ConnectionRefImpl connection ) throws Exception {
+
+        logger.debug( "batchUpdateConnectionIndex" );
 
         // UUID connection_id = connection.getUuid();
 
@@ -2072,6 +2109,8 @@ public class CpRelationManager implements RelationManager {
                                                                   ConnectionRefImpl connection, UUID[] index_keys )
             throws Exception {
 
+        logger.debug("batchDeleteConnectionIndexEntries");
+
         // entity_id,prop_name
         Object property_index_key = key( index_keys[ConnectionRefImpl.ALL], INDEX_CONNECTIONS, entry.getPath(),
                 indexBucketLocator.getBucket( applicationId, IndexBucketLocator.IndexType.CONNECTION, index_keys[ConnectionRefImpl.ALL],
@@ -2121,6 +2160,8 @@ public class CpRelationManager implements RelationManager {
     @Metered(group = "core", name = "RelationManager_batchAddConnectionIndexEntries")
     public Mutator<ByteBuffer> batchAddConnectionIndexEntries( IndexUpdate indexUpdate, 
         IndexUpdate.IndexEntry entry, ConnectionRefImpl conn, UUID[] index_keys ) {
+
+        logger.debug("batchAddConnectionIndexEntries");
 
         // entity_id,prop_name
         Object property_index_key = key( index_keys[ConnectionRefImpl.ALL], 

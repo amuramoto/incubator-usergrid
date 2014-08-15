@@ -540,5 +540,12 @@ public class CpEntityManagerFactory implements EntityManagerFactory, Application
         managerCache.getEntityIndex( CpEntityManagerFactory.SYSTEM_APPS_INDEX_SCOPE ).refresh();
     }
 
-
+    @Override
+    public void flushEntityManagerCaches() {
+        Map<UUID, EntityManager>  entityManagersMap = entityManagers.asMap();
+        for ( UUID appUuid : entityManagersMap.keySet() ) {
+            EntityManager em = entityManagersMap.get(appUuid);
+            em.flushManagerCaches();
+        }
+    }
 }

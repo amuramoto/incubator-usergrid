@@ -15,7 +15,7 @@
             <list>
                 <value>classpath:/usergrid-default.properties</value>
                 <value>classpath:/usergrid-test.properties</value>
-                <value>${usergrid-custom-spring-test-properties}</value>
+                <value>classpath:/usergrid-custom-test.properties</value>
             </list>
         </property>
     </bean>
