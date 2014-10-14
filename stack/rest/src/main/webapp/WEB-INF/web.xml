@@ -16,7 +16,7 @@
     limitations under the License.
 -->
 <web-app version="3.0" xmlns="http://java.sun.com/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd">
-
+    <!--JSP SERVLETS-->
     <display-name>Usergrid REST API Server</display-name>
 
     <context-param>
@@ -101,11 +101,11 @@
             <param-value>true</param-value>
         </init-param>
         <init-param>
-            <param-name>com.sun.jersey.config.property.JSPTemplatesBasePath</param-name>
+            <param-name>jersey.config.server.mvc.templateBasePath.jsp</param-name>
             <param-value>/WEB-INF/jsp</param-value>
         </init-param>
         <init-param>
-            <param-name>com.sun.jersey.config.property.WebPageContentRegex</param-name>
+            <param-name>jersey.config.servlet.filter.staticContentRegex</param-name>
             <param-value>/(((images|css|js|jsp|WEB-INF/jsp)/.*)|(favicon\.ico))</param-value>
         </init-param>
         <init-param>

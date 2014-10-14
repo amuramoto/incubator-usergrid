@@ -146,7 +146,7 @@
                 <configuration>
                     <includeInProject>true</includeInProject>
                     <inputWebXml>${basedir}/src/main/webapp/WEB-INF/web.xml</inputWebXml>
-                    <injectString>&lt;!--FRAGMENT--&gt;</injectString>
+                    <injectString>&lt;!--JSP SERVLETS--&gt;</injectString>
                     <webFragmentFile>${project.build.directory}/web-fragment.xml.txt</webFragmentFile>
                 </configuration>
                 <executions>
