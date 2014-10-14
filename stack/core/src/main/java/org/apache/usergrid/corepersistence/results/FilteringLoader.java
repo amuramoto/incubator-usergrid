@@ -67,6 +67,13 @@ public class FilteringLoader implements ResultsLoader {
     private final EntityIndexBatch indexBatch;
 
 
+    /**
+     * Create an instance of a filter loader
+     * @param managerCache The manager cache to load
+     * @param resultsVerifier
+     * @param ownerId
+     * @param applicationScope
+     */
     protected FilteringLoader( final CpManagerCache managerCache, final ResultsVerifier resultsVerifier,
                                final EntityRef ownerId, final ApplicationScope applicationScope ) {
         this.managerCache = managerCache;
@@ -84,6 +91,9 @@ public class FilteringLoader implements ResultsLoader {
     public Results loadResults( final CandidateResults crs ) {
 
 
+        if(crs.size() == 0){
+            return new Results();
+        }
 
 
         /**
@@ -112,7 +122,7 @@ public class FilteringLoader implements ResultsLoader {
          */
 
         /**
-         * Go through the candidates and group them by scope for more efficient retrieval
+         * Go through the candidates and group them by scope for more efficient retrieval.  Also remove duplicates before we even make a network call
          */
         for ( int i = 0; iter.hasNext(); i++ ) {
 
@@ -149,6 +159,7 @@ public class FilteringLoader implements ResultsLoader {
                         } );
 
                 //deindex this document, and remove the previous maxVersion
+                //we have to deindex this from our ownerId, since this is what gave us the reference
                 deIndex( indexBatch, ownerId, previousMax );
                 groupedByScopes.remove( collectionType, previousMax );
 
@@ -178,23 +189,18 @@ public class FilteringLoader implements ResultsLoader {
                         @Nullable
                         @Override
                         public Id apply( @Nullable final CandidateResult input ) {
-                            if ( input == null ) {
-                                return null;
-                            }
-
-                            return input.getId();
+                            //NOTE this is never null, we won't need to check
+                           return input.getId();
                         }
                     } );
 
 
             //now using the scope, load the collection
 
-
-            // Get the collection scope and batch load all the versions
-            final CollectionScope collScope =
-                    new CollectionScopeImpl( applicationScope.getApplication(), applicationScope.getApplication(),
-                            scopeName );
-
+            // Get the collection scope and batch load all the versions.  We put all entities in app/app for easy retrieval
+            // unless persistence changes, we never want to read from any scope other than the app, app, scope name scope
+            final CollectionScope collScope = new CollectionScopeImpl( 
+                    applicationScope.getApplication(), applicationScope.getApplication(), scopeName );
 
             final EntityCollectionManager ecm = managerCache.getEntityCollectionManager( collScope );
 
@@ -222,9 +228,7 @@ public class FilteringLoader implements ResultsLoader {
         }
 
 
-        //execute the cleanup
-//        indexBatch.execute();
-
+         //NOTE DO NOT execute the batch here.  It changes the results and we need consistent paging until we aggregate all results
         return resultsVerifier.getResults( sortedResults.values() );
     }
 
